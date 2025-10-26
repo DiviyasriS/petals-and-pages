@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: petals_pages
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - petals-network
+
+  product-service:
+    build: ./services/product-service
+    ports:
+      - "5001:5001"
+    environment:
+      - DATABASE_URL=postgresql://admin:admin123@postgres:5432/petals_pages
+    depends_on:
+      - postgres
+    networks:
+      - petals-network
+    restart: unless-stopped
+
+  order-service:
+    build: ./services/order-service
+    ports:
+      - "5002:5002"
+    environment:
+      - DATABASE_URL=postgresql://admin:admin123@postgres:5432/petals_pages
+    depends_on:
+      - postgres
+    networks:
+      - petals-network
+    restart: unless-stopped
+
+  user-service:
+    build: ./services/user-service
+    ports:
+      - "5003:5003"
+    environment:
+      - DATABASE_URL=postgresql://admin:admin123@postgres:5432/petals_pages
+    depends_on:
+      - postgres
+    networks:
+      - petals-network
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - product-service
+      - order-service
+      - user-service
+    networks:
+      - petals-network
+    restart: unless-stopped
+
+networks:
+  petals-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
