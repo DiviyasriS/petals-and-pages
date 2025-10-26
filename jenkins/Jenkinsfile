@@ -2,111 +2,63 @@ pipeline {
     agent any
     
     environment {
-        DOCKER_REGISTRY = 'localhost:5000'
-        KUBE_NAMESPACE = 'petals-pages'
+        PROJECT_NAME = 'petals-pages'
     }
     
     stages {
         stage('Checkout') {
             steps {
+                echo '✅ Checking out code from Git'
                 checkout scm
-                echo '✅ Code checked out successfully'
             }
         }
         
         stage('Build Services') {
-            parallel {
-                stage('Build Product Service') {
-                    steps {
-                        dir('services/product-service') {
-                            sh 'docker build -t product-service:${BUILD_NUMBER} .'
-                            sh 'docker tag product-service:${BUILD_NUMBER} product-service:latest'
-                            echo '✅ Product service built'
-                        }
-                    }
-                }
-                stage('Build Order Service') {
-                    steps {
-                        dir('services/order-service') {
-                            sh 'docker build -t order-service:${BUILD_NUMBER} .'
-                            sh 'docker tag order-service:${BUILD_NUMBER} order-service:latest'
-                            echo '✅ Order service built'
-                        }
-                    }
-                }
-                stage('Build User Service') {
-                    steps {
-                        dir('services/user-service') {
-                            sh 'docker build -t user-service:${BUILD_NUMBER} .'
-                            sh 'docker tag user-service:${BUILD_NUMBER} user-service:latest'
-                            echo '✅ User service built'
-                        }
-                    }
-                }
-                stage('Build Frontend') {
-                    steps {
-                        dir('frontend') {
-                            sh 'docker build -t frontend:${BUILD_NUMBER} .'
-                            sh 'docker tag frontend:${BUILD_NUMBER} frontend:latest'
-                            echo '✅ Frontend built'
-                        }
-                    }
-                }
+            steps {
+                echo '🔨 Building all services with Docker Compose'
+                sh 'docker-compose build'
             }
         }
         
-        stage('Test') {
+        stage('Test Services') {
             steps {
-                echo '🧪 Running tests...'
+                echo '🧪 Testing services'
                 sh '''
-                    echo "Testing product service health endpoint..."
-                    docker run --rm product-service:latest python -c "print('Product service OK')"
+                    echo "Testing Product Service..."
+                    docker run --rm petals-and-pages-product-service python -c "print('Product Service OK')"
                     
-                    echo "Testing order service..."
-                    docker run --rm order-service:latest node -e "console.log('Order service OK')"
+                    echo "Testing Order Service..."  
+                    docker run --rm petals-and-pages-order-service node -e "console.log('Order Service OK')"
                     
-                    echo "Testing user service..."
-                    docker run --rm user-service:latest python -c "print('User service OK')"
+                    echo "Testing User Service..."
+                    docker run --rm petals-and-pages-user-service python -c "print('User Service OK')"
                 '''
-                echo '✅ All tests passed'
             }
         }
         
-        stage('Deploy to Kubernetes') {
+        stage('Deploy') {
             steps {
-                echo '🚀 Deploying to Kubernetes...'
-                sh '''
-                    kubectl apply -f kubernetes/namespace.yaml
-                    kubectl apply -f kubernetes/postgres-deployment.yaml
-                    kubectl apply -f kubernetes/product-service-deployment.yaml
-                    kubectl apply -f kubernetes/order-service-deployment.yaml
-                    kubectl apply -f kubernetes/user-service-deployment.yaml
-                    kubectl apply -f kubernetes/frontend-deployment.yaml
-                    
-                    kubectl rollout status deployment/product-service -n ${KUBE_NAMESPACE}
-                    kubectl rollout status deployment/order-service -n ${KUBE_NAMESPACE}
-                    kubectl rollout status deployment/user-service -n ${KUBE_NAMESPACE}
-                    kubectl rollout status deployment/frontend -n ${KUBE_NAMESPACE}
-                '''
-                echo '✅ Deployment successful'
+                echo '🚀 Deploying with Docker Compose'
+                sh 'docker-compose up -d'
             }
         }
         
-        stage('Verify Deployment') {
+        stage('Verify') {
             steps {
-                echo '🔍 Verifying deployment...'
-                sh '''
-                    kubectl get pods -n ${KUBE_NAMESPACE}
-                    kubectl get svc -n ${KUBE_NAMESPACE}
-                '''
-                echo '✅ Verification complete'
+                echo '🔍 Verifying deployment'
+                sh 'docker-compose ps'
+                sh 'sleep 10'
+                sh 'curl -f http://localhost:5001/health || exit 1'
+                sh 'curl -f http://localhost:5002/health || exit 1'
+                sh 'curl -f http://localhost:5003/health || exit 1'
             }
         }
     }
     
     post {
         success {
-            echo '🎉 Pipeline completed successfully!'
+            echo '✅ Pipeline completed successfully!'
+            echo '🌸📚 Petals & Pages is deployed at http://localhost:3000'
         }
         failure {
             echo '❌ Pipeline failed!'
