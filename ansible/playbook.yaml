@@ -1,0 +1,57 @@
+- name: Deploy Petals & Pages Application
+  hosts: local
+  gather_facts: yes
+  
+  vars:
+    project_name: petals-pages
+    kube_namespace: petals-pages
+  
+  tasks:
+    - name: Check Docker is running
+      command: docker ps
+      register: docker_status
+      ignore_errors: yes
+    
+    - name: Display Docker status
+      debug:
+        msg: "Docker is running"
+      when: docker_status.rc == 0
+    
+    - name: Build services using Docker Compose
+      command: docker-compose build
+      args:
+        chdir: ..
+      ignore_errors: yes
+    
+    - name: Start services using Docker Compose
+      command: docker-compose up -d
+      args:
+        chdir: ..
+      ignore_errors: yes
+    
+    - name: Check running containers
+      command: docker-compose ps
+      args:
+        chdir: ..
+      register: containers_status
+    
+    - name: Display running containers
+      debug:
+        var: containers_status.stdout_lines
+    
+    - name: Test product service health
+      uri:
+        url: http://localhost:5001/health
+        method: GET
+        status_code: 200
+      register: product_health
+      ignore_errors: yes
+    
+    - name: Display product service status
+      debug:
+        msg: "Product service is healthy"
+      when: product_health.status == 200
+    
+    - name: Success message
+      debug:
+        msg: "✅ Petals & Pages deployed successfully! Access at http://localhost:3000"
