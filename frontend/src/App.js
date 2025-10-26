@@ -296,4 +296,4 @@ const PetalsAndPages = () => {
   );
 };
 
-export default PetalsAndPages;
+export default PetalsAndPages;// Wishlist feature
